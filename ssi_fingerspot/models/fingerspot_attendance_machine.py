@@ -120,7 +120,7 @@ class FingerspotAttendanceMachine(models.Model):
         ]
         timesheet_ids = obj_timesheet.search(criteria, limit=1)
         if timesheet_ids:
-            result = timesheet_ids.id
+            result = timesheet_ids
         return result
 
     def action_mark_is_transfer(self):
@@ -168,8 +168,8 @@ class FingerspotAttendanceMachine(models.Model):
         obj_attendance = self.env["hr.timesheet_attendance"]
         latest = False
         for record in self:
-            timesheet_id = record._check_timesheet()
-            if not timesheet_id:
+            timesheet = record._check_timesheet()
+            if not timesheet:
                 msg_err = _("Timesheet for employee %s not found.") % (
                     record.employee_id.display_name,
                 )
@@ -196,7 +196,7 @@ class FingerspotAttendanceMachine(models.Model):
                 continue
 
             attendance_vals = {
-                "sheet_id": timesheet_id,
+                "sheet_id": timesheet.id,
                 "employee_id": record.employee_id.id,
             }
             if int(record.status_scan) % 2 == 0:
@@ -218,6 +218,8 @@ class FingerspotAttendanceMachine(models.Model):
                 _check = 0.0
                 checkout_buffer = 0.0
                 if latest_attendance_id:
+                    company = self.env.company
+                    checkout_buffer = company.checkout_buffer
                     latest_employee_id = latest_attendance_id.employee_id.id
                     if latest_employee_id == record.employee_id.id:
                         check_out = record.scan_date
@@ -231,15 +233,11 @@ class FingerspotAttendanceMachine(models.Model):
                                 check_out - schedule_check_out
                             ).total_seconds() / 3600.0
                         else:
-                            msg_err = _("No Schedule Date End define.")
-                            record.write(
-                                {
-                                    "err_msg": msg_err,
-                                }
-                            )
-                            continue
-                        company = self.env.company
-                        checkout_buffer = company.checkout_buffer
+                            hours_per_day = timesheet.working_schedule_id.hours_per_day
+                            checkout_buffer += hours_per_day
+                            _check = (
+                                check_out - latest_attendance_id.check_in
+                            ).total_seconds() / 3600.0
                         if latest_attendance_id.check_out or (_check > checkout_buffer):
                             # Apabila latest_attendance tidak sesuai kriteria buffer
                             latest = record._generate_attendance_by_system(
@@ -260,7 +258,12 @@ class FingerspotAttendanceMachine(models.Model):
                     # Apabila tidak ada latest_attendance
                     latest = record._generate_attendance_by_system(attendance_vals)
 
-            record.write({"is_transfer": True})
+            record.write(
+                {
+                    "is_transfer": True,
+                    "err_msg": "-",
+                }
+            )
 
     def action_generate_attendances(self):
         to_generate = self.filtered(
