@@ -1,0 +1,4 @@
+odoo14-addon-ssi-timesheet-attendance
+odoo14-addon-ssi-master-data-mixin
+odoo14-addon-queue-job
+odoo14-addon-queue-job-batch
