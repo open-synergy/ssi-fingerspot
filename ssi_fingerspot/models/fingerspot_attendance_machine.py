@@ -281,7 +281,7 @@ class FingerspotAttendanceMachine(models.Model):
 
     def action_generate_attendances(self):
         to_generate = self.filtered(
-            lambda x: x.is_transfer is False and x.employee_id
+            lambda x: x.is_transfer is False and x.is_skip is False and x.employee_id
         ).sorted(lambda m: (m.pin))
 
         tz = pytz.timezone(self.env.user.tz or "Asia/Jakarta")
