@@ -62,6 +62,12 @@ class FingerspotAttendanceMachine(models.Model):
         copy=False,
         readonly=True,
     )
+    is_skip = fields.Boolean(
+        string="Is Skip?",
+        required=False,
+        copy=False,
+        readonly=True,
+    )
     err_msg = fields.Char(
         string="Error",
         default="-",
@@ -130,6 +136,14 @@ class FingerspotAttendanceMachine(models.Model):
     def action_unmark_is_transfer(self):
         for record in self:
             record.is_transfer = False
+
+    def action_mark_is_skip(self):
+        for record in self:
+            record.is_skip = True
+
+    def action_unmark_is_skip(self):
+        for record in self:
+            record.is_skip = False
 
     def _get_latest_attendance(self):
         self.ensure_one()

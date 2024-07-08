@@ -15,11 +15,17 @@
             <field name="employee_id" />
             <field name="machine_id" />
             <field name="is_transfer" />
+            <field name="is_skip" />
             <separator />
             <filter
                     name="transferred"
                     string="Transferred"
                     domain="[('is_transfer', '=', True)]"
+                />
+            <filter
+                    name="skipped"
+                    string="Skipped"
+                    domain="[('is_skip', '=', True)]"
                 />
             <filter
                     name="not_transferred"
@@ -47,6 +53,11 @@
                         string="Is Transfer?"
                         context="{'group_by':'is_transfer'}"
                     />
+                <filter
+                        name="grp_skip"
+                        string="Is Skip?"
+                        context="{'group_by':'is_skip'}"
+                    />
             </group>
         </search>
     </field>
@@ -73,6 +84,16 @@
                         name="action_unmark_is_transfer"
                         type="object"
                         string="Unmark Is Transfer"
+                />
+                <button
+                        name="action_mark_is_skip"
+                        type="object"
+                        string="Mark Is Skip"
+                />
+                <button
+                        name="action_unmark_is_skip"
+                        type="object"
+                        string="Unmark Is Skip"
                 /> -->
             </header>
             <field name="scan_date" />
@@ -82,6 +103,7 @@
             <field name="status_scan" />
             <field name="machine_id" />
             <field name="is_transfer" optional="hide" />
+            <field name="is_skip" optional="hide" />
             <field name="err_msg" />
         </tree>
     </field>
@@ -101,6 +123,7 @@
                     <field name="employee_id" />
                     <field name="machine_id" />
                     <field name="is_transfer" />
+                    <field name="is_skip" />
                 </group>
             </sheet>
         </form>
