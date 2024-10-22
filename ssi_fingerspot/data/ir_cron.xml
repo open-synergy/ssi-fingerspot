@@ -10,7 +10,7 @@
             <field name="model_id" ref="model_fingerspot_attendance_machine" />
             <field name="state">code</field>
             <field name="code">model._cron_generate_attendances()</field>
-            <field name="user_id" ref="base.user_root" />
+            <field name="user_id" ref="base.user_admin" />
             <field name="interval_number">12</field>
             <field name="interval_type">hours</field>
             <field name="numbercall">-1</field>

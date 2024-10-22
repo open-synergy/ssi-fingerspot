@@ -11,7 +11,7 @@ import requests
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
-_logger = logging.getLogger(__name__)
+from odoo.addons.ssi_decorator import ssi_decorator
 
 _logger = logging.getLogger(__name__)
 
@@ -21,9 +21,105 @@ except (ImportError, IOError) as err:
     _logger.debug(err)
 
 
-class FingerspotMachineTransactionWizard(models.TransientModel):
-    _name = "fingerspot.attendance.machine.import.wizard"
-    _description = "Import Attendance From Machine"
+class FingerspotAttendanceMachineBatch(models.Model):
+    _name = "fingerspot.attendance.machine.batch"
+    _description = "Fingerspot Attendance Batch"
+    _inherit = [
+        "mixin.transaction_queue_cancel",
+        "mixin.transaction_queue_done",
+        "mixin.transaction_confirm",
+        "mixin.transaction_date_duration",
+        "mixin.many2one_configurator",
+    ]
+
+    # Multiple Approval Attribute
+    _approval_from_state = "draft"
+    _approval_to_state = "action_queue_done"
+    _approval_state = "confirm"
+    _after_approved_method = "action_queue_done"
+
+    # Attributes related to add element on view automatically
+    _automatically_insert_view_element = True
+    _automatically_insert_multiple_approval_page = True
+    _automatically_insert_cancel_policy_fields = False
+    _automatically_insert_cancel_button = False
+    _automatically_insert_cancel_reason = False
+    _automatically_insert_done_policy_fields = False
+    _automatically_insert_done_button = False
+    _automatically_insert_queue_done_button = False
+    _automatically_insert_queue_cancel_button = False
+
+    _queue_processing_create_page = True
+    _queue_to_done_insert_form_element_ok = True
+    _queue_to_done_form_xpath = "//group[@name='queue_processing']"
+
+    _queue_to_cancel_insert_form_element_ok = True
+    _queue_to_cancel_form_xpath = "//group[@name='queue_processing']"
+
+    _method_to_run_from_wizard = "action_queue_cancel"
+
+    _statusbar_visible_label = "draft,confirm,queue_done,done"
+    _policy_field_order = [
+        "confirm_ok",
+        "approve_ok",
+        "reject_ok",
+        "restart_approval_ok",
+        "queue_cancel_ok",
+        "cancel_ok",
+        "restart_ok",
+        "done_ok",
+        "queue_done_ok",
+        "manual_number_ok",
+    ]
+
+    _header_button_order = [
+        "action_confirm",
+        "action_approve_approval",
+        "action_reject_approval",
+        "%(ssi_transaction_cancel_mixin.base_select_cancel_reason_action)d",
+        "action_restart",
+    ]
+
+    # Attributes related to add element on search view automatically
+    _state_filter_order = [
+        "dom_draft",
+        "dom_confirm",
+        "dom_reject",
+        "dom_queue_done",
+        "dom_done",
+        "dom_terminate",
+        "dom_queue_cancel",
+        "dom_cancel",
+    ]
+
+    # Sequence attribute
+    _create_sequence_state = "done"
+
+    _auto_enqueue_done = True
+
+    @api.model
+    def _get_policy_field(self):
+        res = super(FingerspotAttendanceMachineBatch, self)._get_policy_field()
+        policy_field = [
+            "confirm_ok",
+            "approve_ok",
+            "cancel_ok",
+            "queue_cancel_ok",
+            "done_ok",
+            "queue_done_ok",
+            "reject_ok",
+            "restart_ok",
+            "restart_approval_ok",
+            "manual_number_ok",
+        ]
+        res += policy_field
+        return res
+
+    @ssi_decorator.insert_on_form_view()
+    def _insert_form_element(self, view_arch):
+        if self._automatically_insert_view_element:
+            view_arch = self._reconfigure_statusbar_visible(view_arch)
+        return view_arch
 
     @api.model
     def _get_fingerspot_backend_id(self):
@@ -55,17 +151,11 @@ class FingerspotMachineTransactionWizard(models.TransientModel):
         comodel_name="fingerspot.data.machine",
         required=True,
     )
-
-    date_start = fields.Date(
-        string="Date Start",
-        required=True,
-        default=fields.Date.context_today,
-    )
-
-    date_end = fields.Date(
-        string="Date End",
-        required=True,
-        default=fields.Date.context_today,
+    attendance_machine_ids = fields.One2many(
+        string="Attendance Machines",
+        comodel_name="fingerspot.attendance.machine",
+        inverse_name="batch_id",
+        readonly=True,
     )
 
     @api.constrains("date_start", "date_end")
@@ -92,13 +182,10 @@ class FingerspotMachineTransactionWizard(models.TransientModel):
 
     def _import_attendance(self, date):
         self.ensure_one()
-        str_group = "Import attendance Batch %s for %s" % (self.machine_id.name, date)
-        batch = self.env["queue.job.batch"].get_new_batch(str_group)
         description = "Import attendance for %s" % (date)
-        self.with_context(job_batch=batch).with_delay(
+        self.with_context(job_batch=self.done_queue_job_batch_id).with_delay(
             description=_(description)
         )._get_attlog(date)
-        batch.enqueue()
 
     def _get_attlog(self, date):
         self.ensure_one()
@@ -128,6 +215,7 @@ class FingerspotMachineTransactionWizard(models.TransientModel):
         self.ensure_one()
         return {
             "machine_id": self.machine_id.id,
+            "batch_id": self.id,
             "scan_date": self._convert_datetime_utc(data["scan_date"]),
             "pin": data["pin"],
             "verify": str(data["verify"]),
@@ -156,12 +244,6 @@ class FingerspotMachineTransactionWizard(models.TransientModel):
                         )
                         att_machine.onchange_employee_id()
 
-    def action_import(self):
-        date_start = self.date_start
-        date_list = pd.date_range(date_start, self.date_end, freq="D")
-        for index in date_list.strftime("%Y-%m-%d"):
-            self._import_attendance(index)
-
     def _cron_import_attendance(self):
         obj_data_machine = self.env["fingerspot.data.machine"]
         company = self.env.company
@@ -174,7 +256,7 @@ class FingerspotMachineTransactionWizard(models.TransientModel):
         machine_ids = obj_data_machine.search([])
         if machine_ids:
             for machine in machine_ids:
-                wizard = self.create(
+                fs_batch = self.create(
                     {
                         "fingerspot_backend_id": fingerspot_backend_id,
                         "machine_id": machine.id,
@@ -182,4 +264,22 @@ class FingerspotMachineTransactionWizard(models.TransientModel):
                         "date_end": user_date_now,
                     }
                 )
-                wizard.action_import()
+                try:
+                    fs_batch.action_confirm()
+                except Exception as e:
+                    raise UserError(str(e))
+
+                try:
+                    fs_batch.with_context(
+                        {"bypass_policy_check": True}
+                    ).action_approve_approval()
+                except Exception as e:
+                    raise UserError(str(e))
+
+    @ssi_decorator.post_queue_done_action()
+    def _fingerspot_get_attendance(self):
+        self.ensure_one()
+        date_start = self.date_start
+        date_list = pd.date_range(date_start, self.date_end, freq="D")
+        for index in date_list.strftime("%Y-%m-%d"):
+            self._import_attendance(index)
