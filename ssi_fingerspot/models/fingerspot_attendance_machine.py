@@ -12,6 +12,12 @@ class FingerspotAttendanceMachine(models.Model):
     _rec_name = "employee_id"
     _order = "scan_date"
 
+    batch_id = fields.Many2one(
+        string="# Batch",
+        comodel_name="fingerspot.attendance.machine.batch",
+        required=True,
+        ondelete="cascade",
+    )
     machine_id = fields.Many2one(
         string="# Machine",
         comodel_name="fingerspot.data.machine",

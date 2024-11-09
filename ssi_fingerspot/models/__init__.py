@@ -7,6 +7,7 @@ from . import (
     fingerspot_machine_user,
     fingerspot_attendance_machine,
     fingerspot_backend,
+    fingerspot_attendance_machine_batch,
     hr_timesheet_attendance,
     res_company,
 )
