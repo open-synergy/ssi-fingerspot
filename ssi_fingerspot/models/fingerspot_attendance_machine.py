@@ -111,7 +111,9 @@ class FingerspotAttendanceMachine(models.Model):
                 ("check_out", "=", self.scan_date),
                 ("employee_id", "=", self.employee_id.id),
             ]
-        attendance_ids = obj_attendance.search(criteria)
+        attendance_ids = obj_attendance.search(  # pylint: disable=no-search-all
+            criteria
+        )
         if attendance_ids:
             result = True
         return result
@@ -184,7 +186,11 @@ class FingerspotAttendanceMachine(models.Model):
         )
         return obj_attendance.create(attendance_vals)
 
-    def _generate_attendances(self):
+    def _generate_attendances(
+        self,
+    ):
+        # pylint: disable=too-many-locals,too-many-branches
+        # pylint: disable=too-many-statements,too-many-nested-blocks
         obj_attendance = self.env["hr.timesheet_attendance"]
         latest = False
         for record in self:
@@ -204,10 +210,12 @@ class FingerspotAttendanceMachine(models.Model):
                 tz = pytz.timezone(record.employee_id.tz or "Asia/Jakarta")
                 current_datetime = pytz.utc.localize(record.scan_date).astimezone(tz)
                 attendance_date = current_datetime.strftime("%d/%m/%Y %H:%M:%S")
-                msg_err = _("Attendance %s for employee %s already exists.") % (
-                    attendance_date,
-                    record.employee_id.display_name,
-                )
+                msg_err = _(
+                    "Attendance %(date)s for employee %(employee)s already exists."
+                ) % {
+                    "date": attendance_date,
+                    "employee": record.employee_id.display_name,
+                }
                 record.write(
                     {
                         "err_msg": msg_err,
@@ -295,14 +303,14 @@ class FingerspotAttendanceMachine(models.Model):
         current_datetime = pytz.utc.localize(time_now).astimezone(tz)
         attendance_date = current_datetime.strftime("%d/%m/%Y %H:%M:%S")
         if to_generate:
-            str_group = "Generate attendance Batch for %s" % (attendance_date)
+            str_group = f"Generate attendance Batch for {attendance_date}"
             batch = self.env["queue.job.batch"].get_new_batch(str_group)
-            description = "Generate attendance for %s" % (attendance_date)
+            description = f"Generate attendance for {attendance_date}"
             to_generate.with_context(job_batch=batch).with_delay(
                 description=_(description)
             )._generate_attendances()
             batch.enqueue()
 
     def _cron_generate_attendances(self):
-        attendance_machine_ids = self.search([])
+        attendance_machine_ids = self.search([])  # pylint: disable=no-search-all
         attendance_machine_ids.action_generate_attendances()

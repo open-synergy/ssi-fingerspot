@@ -5,7 +5,7 @@
 from odoo import fields, models
 
 
-class FingerspotMachineUser(models.Model):
+class FingerspotMachineUser(models.Model):  # pylint: disable=too-few-public-methods
     _name = "fingerspot.machine.user"
     _description = "Fingerspot Machine User"
     _rec_name = "employee_id"

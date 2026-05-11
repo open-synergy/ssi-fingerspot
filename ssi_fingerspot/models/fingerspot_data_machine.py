@@ -5,7 +5,7 @@
 from odoo import fields, models
 
 
-class FingerspotDataMachine(models.Model):
+class FingerspotDataMachine(models.Model):  # pylint: disable=too-few-public-methods
     _name = "fingerspot.data.machine"
     _inherit = ["mixin.master_data"]
     _description = "Fingerspot Data Machine"
