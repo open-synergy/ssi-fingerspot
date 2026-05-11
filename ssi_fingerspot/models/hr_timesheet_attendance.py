@@ -5,7 +5,7 @@
 from odoo import fields, models
 
 
-class HRTimesheetAttendance(models.Model):
+class HRTimesheetAttendance(models.Model):  # pylint: disable=too-few-public-methods
     _inherit = "hr.timesheet_attendance"
 
     fingerspot_att_in = fields.Many2one(

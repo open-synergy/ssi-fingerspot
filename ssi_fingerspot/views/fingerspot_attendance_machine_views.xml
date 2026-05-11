@@ -22,11 +22,7 @@
                     string="Transferred"
                     domain="[('is_transfer', '=', True)]"
                 />
-            <filter
-                    name="skipped"
-                    string="Skipped"
-                    domain="[('is_skip', '=', True)]"
-                />
+            <filter name="skipped" string="Skipped" domain="[('is_skip', '=', True)]" />
             <filter
                     name="not_transferred"
                     string="Not Yet Transferred"

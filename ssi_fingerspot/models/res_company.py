@@ -4,7 +4,7 @@
 from odoo import fields, models
 
 
-class ResCompany(models.Model):
+class ResCompany(models.Model):  # pylint: disable=too-few-public-methods
     _inherit = "res.company"
 
     fingerspot_backend_id = fields.Many2one(

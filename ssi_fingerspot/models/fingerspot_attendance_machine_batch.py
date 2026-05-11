@@ -21,7 +21,9 @@ except (ImportError, IOError) as err:
     _logger.debug(err)
 
 
-class FingerspotAttendanceMachineBatch(models.Model):
+class FingerspotAttendanceMachineBatch(
+    models.Model
+):  # pylint: disable=too-few-public-methods
     _name = "fingerspot.attendance.machine.batch"
     _description = "Fingerspot Attendance Batch"
     _inherit = [
@@ -99,7 +101,7 @@ class FingerspotAttendanceMachineBatch(models.Model):
 
     @api.model
     def _get_policy_field(self):
-        res = super(FingerspotAttendanceMachineBatch, self)._get_policy_field()
+        res = super()._get_policy_field()
         policy_field = [
             "confirm_ok",
             "approve_ok",
@@ -162,7 +164,9 @@ class FingerspotAttendanceMachineBatch(models.Model):
     def _check_date_start_end(self):
         for record in self:
             if record.date_start and record.date_end:
-                strWarning = _("Date end must be greater than date start")
+                strWarning = _(  # pylint: disable=invalid-name
+                    "Date end must be greater than date start"
+                )
                 if record.date_end < record.date_start:
                     raise UserError(strWarning)
 
@@ -177,12 +181,11 @@ class FingerspotAttendanceMachineBatch(models.Model):
             convert_utc = tz.localize(convert_dt).astimezone(pytz.utc)
             format_utc = convert_utc.strftime("%Y-%m-%d %H:%M:%S")
             return format_utc
-        else:
-            return "-"
+        return "-"
 
     def _import_attendance(self, date):
         self.ensure_one()
-        description = "Import attendance for %s" % (date)
+        description = f"Import attendance for {date}"
         self.with_context(job_batch=self.done_queue_job_batch_id).with_delay(
             description=_(description)
         )._get_attlog(date)
@@ -193,7 +196,7 @@ class FingerspotAttendanceMachineBatch(models.Model):
         url = backend.base_url + backend.api_attlog
         api_token = backend.api_token
         headers = {
-            "Authorization": "Bearer %s" % api_token,
+            "Authorization": f"Bearer {api_token}",
         }
         payload = json.dumps(
             {
@@ -205,11 +208,13 @@ class FingerspotAttendanceMachineBatch(models.Model):
         )
 
         try:
-            response = requests.request("POST", url, headers=headers, data=payload)
+            response = requests.request(
+                "POST", url, headers=headers, data=payload, timeout=30
+            )
             result = response.json()
             self._get_result(result)
         except Exception as e:
-            raise UserError(str(e))
+            raise UserError(str(e)) from e
 
     def _prepare_att_machine_data(self, data):
         self.ensure_one()
@@ -253,7 +258,7 @@ class FingerspotAttendanceMachineBatch(models.Model):
         user_date_now = utc_date_now.astimezone(tz).date()
         date_start = user_date_now - timedelta(days=2)
 
-        machine_ids = obj_data_machine.search([])
+        machine_ids = obj_data_machine.search([])  # pylint: disable=no-search-all
         if machine_ids:
             for machine in machine_ids:
                 fs_batch = self.create(
@@ -267,14 +272,14 @@ class FingerspotAttendanceMachineBatch(models.Model):
                 try:
                     fs_batch.action_confirm()
                 except Exception as e:
-                    raise UserError(str(e))
+                    raise UserError(str(e)) from e
 
                 try:
                     fs_batch.with_context(
-                        {"bypass_policy_check": True}
+                        bypass_policy_check=True
                     ).action_approve_approval()
                 except Exception as e:
-                    raise UserError(str(e))
+                    raise UserError(str(e)) from e
 
     @ssi_decorator.post_queue_done_action()
     def _fingerspot_get_attendance(self):
