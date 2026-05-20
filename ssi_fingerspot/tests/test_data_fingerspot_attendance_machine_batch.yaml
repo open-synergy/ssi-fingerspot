@@ -1,0 +1,284 @@
+scenarios:
+  - name: "Fingerspot Attendance Machine Batch - Full lifecycle without approval"
+    steps:
+      - step: "Create employee for machine user"
+        action: "create"
+        model: "hr.employee"
+        save_as: "employee"
+        values:
+          name: "Test Employee Fingerspot"
+
+      - step: "Create fingerspot backend"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend"
+        values:
+          name: "Test Backend Batch"
+          code: "FBATCH"
+          base_url: "http://batch.fingerspot.local"
+          api_token: "token_batch"
+          api_attlog: "/api/attlog"
+
+      - step: "Set backend as running"
+        action: "call"
+        target: "backend"
+        method: "action_running"
+        asserts:
+          state:
+            type: "value"
+            expected: "running"
+
+      - step: "Create fingerspot data machine"
+        action: "create"
+        model: "fingerspot.data.machine"
+        save_as: "machine"
+        values:
+          name: "Test Machine Batch"
+          code: "MACHBATCH"
+          device_id: "DEVICE-BATCH-001"
+
+      - step: "Create machine user with PIN"
+        action: "create"
+        model: "fingerspot.machine.user"
+        save_as: "machine_user"
+        values:
+          machine_id: "EVAL: registry['machine'].id"
+          pin: "99001"
+          employee_id: "EVAL: registry['employee'].id"
+
+      - step: "Create attendance machine batch"
+        action: "create"
+        model: "fingerspot.attendance.machine.batch"
+        save_as: "batch"
+        as_user: "base.user_admin"
+        values:
+          fingerspot_backend_id: "EVAL: registry['backend'].id"
+          machine_id: "EVAL: registry['machine'].id"
+          date_start: "2024-01-15"
+          date_end: "2024-01-17"
+
+      - step: "Assert batch created in draft state"
+        action: "assert"
+        target: "batch"
+        asserts:
+          state:
+            type: "value"
+            expected: "draft"
+          machine_id:
+            type: "value"
+            operator: "is_truthy"
+
+      - step: "Confirm batch"
+        action: "call"
+        target: "batch"
+        method: "action_confirm"
+        as_user: "base.user_admin"
+        asserts:
+          state:
+            type: "value"
+            expected: "confirm"
+
+      - step: "Call _prepare_att_machine_data to test utility method"
+        action: "call"
+        target: "batch"
+        method: "_prepare_att_machine_data"
+        kwargs:
+          data:
+            pin: "99001"
+            scan_date: "2024-01-15 08:00:00"
+            verify: 1
+            status_scan: 0
+
+      - step: "Call _convert_datetime_utc with valid datetime"
+        action: "call"
+        target: "batch"
+        method: "_convert_datetime_utc"
+        args:
+          - "2024-01-15 08:00:00"
+
+      - step: "Call _convert_datetime_utc with None"
+        action: "call"
+        target: "batch"
+        method: "_convert_datetime_utc"
+        args:
+          - null
+
+      - step: "Call _get_result with empty data"
+        action: "call"
+        target: "batch"
+        method: "_get_result"
+        kwargs:
+          result:
+            success: true
+            data: []
+
+      - step: "Call _get_result with attendance data - creates record"
+        action: "call"
+        target: "batch"
+        method: "_get_result"
+        kwargs:
+          result:
+            success: true
+            data:
+              - pin: "99001"
+                scan_date: "2024-01-15 08:00:00"
+                verify: 1
+                status_scan: 0
+
+      - step: "Assert attendance machine record was created"
+        action: "search"
+        model: "fingerspot.attendance.machine"
+        domain:
+          - ["batch_id", "=", "EVAL: registry['batch'].id"]
+          - ["pin", "=", "99001"]
+        save_as: "att_machine"
+        expect_count: 1
+
+      - step: "Assert attendance machine has correct data"
+        action: "assert"
+        target: "att_machine"
+        asserts:
+          pin:
+            type: "value"
+            expected: "99001"
+          employee_id:
+            type: "value"
+            operator: "is_truthy"
+
+  - name: "Fingerspot Attendance Machine - Mark actions"
+    steps:
+      - step: "Create fingerspot backend for actions test"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend"
+        values:
+          name: "Test Backend Actions"
+          code: "FBACT"
+          base_url: "http://actions.fingerspot.local"
+          api_token: "token_actions"
+          api_attlog: "/api/attlog"
+
+      - step: "Create data machine for actions test"
+        action: "create"
+        model: "fingerspot.data.machine"
+        save_as: "machine"
+        values:
+          name: "Test Machine Actions"
+          code: "MACHACT"
+          device_id: "DEVICE-ACT-001"
+
+      - step: "Create batch for attendance records"
+        action: "create"
+        model: "fingerspot.attendance.machine.batch"
+        save_as: "batch"
+        as_user: "base.user_admin"
+        values:
+          fingerspot_backend_id: "EVAL: registry['backend'].id"
+          machine_id: "EVAL: registry['machine'].id"
+          date_start: "2024-02-01"
+          date_end: "2024-02-01"
+
+      - step: "Create attendance machine record"
+        action: "create"
+        model: "fingerspot.attendance.machine"
+        save_as: "att"
+        values:
+          batch_id: "EVAL: registry['batch'].id"
+          machine_id: "EVAL: registry['machine'].id"
+          pin: "00001"
+          scan_date: "2024-02-01 08:00:00"
+          verify: "1"
+          status_scan: "0"
+
+      - step: "Assert initial transfer and skip flags are false"
+        action: "assert"
+        target: "att"
+        asserts:
+          is_transfer:
+            type: "value"
+            expected: false
+          is_skip:
+            type: "value"
+            expected: false
+
+      - step: "Mark as transfer"
+        action: "call"
+        target: "att"
+        method: "action_mark_is_transfer"
+        asserts:
+          is_transfer:
+            type: "value"
+            expected: true
+
+      - step: "Unmark transfer"
+        action: "call"
+        target: "att"
+        method: "action_unmark_is_transfer"
+        asserts:
+          is_transfer:
+            type: "value"
+            expected: false
+
+      - step: "Mark as skip"
+        action: "call"
+        target: "att"
+        method: "action_mark_is_skip"
+        asserts:
+          is_skip:
+            type: "value"
+            expected: true
+
+      - step: "Unmark skip"
+        action: "call"
+        target: "att"
+        method: "action_unmark_is_skip"
+        asserts:
+          is_skip:
+            type: "value"
+            expected: false
+
+  - name: "Fingerspot Backend - Get fingerspot backend ID default"
+    steps:
+      - step: "Create backend and set running for company default test"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend"
+        values:
+          name: "Test Backend Default"
+          code: "FBDEF"
+          base_url: "http://default.fingerspot.local"
+          api_token: "token_default"
+          api_attlog: "/api/attlog"
+
+      - step: "Set backend running so company gets it"
+        action: "call"
+        target: "backend"
+        method: "action_running"
+
+      - step: "Create data machine"
+        action: "create"
+        model: "fingerspot.data.machine"
+        save_as: "machine"
+        values:
+          name: "Test Machine Default"
+          code: "MACHDEF"
+          device_id: "DEVICE-DEF-001"
+
+      - step: "Create batch - backend_id should default to running backend"
+        action: "create"
+        model: "fingerspot.attendance.machine.batch"
+        save_as: "batch"
+        as_user: "base.user_admin"
+        values:
+          fingerspot_backend_id: "EVAL: registry['backend'].id"
+          machine_id: "EVAL: registry['machine'].id"
+          date_start: "2024-03-01"
+          date_end: "2024-03-02"
+
+      - step: "Assert batch fingerspot_backend_id is set"
+        action: "assert"
+        target: "batch"
+        asserts:
+          fingerspot_backend_id:
+            type: "value"
+            operator: "is_truthy"

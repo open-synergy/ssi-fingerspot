@@ -1,0 +1,143 @@
+scenarios:
+  - name: "Fingerspot Backend - Create and activate"
+    steps:
+      - step: "Create fingerspot backend"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend"
+        values:
+          name: "Test Backend FB001"
+          code: "FB001"
+          base_url: "http://test.fingerspot.local"
+          api_token: "test_token_001"
+          api_attlog: "/api/attlog"
+
+      - step: "Assert initial state is draft"
+        action: "assert"
+        target: "backend"
+        asserts:
+          state:
+            type: "value"
+            expected: "draft"
+
+      - step: "Set backend as running"
+        action: "call"
+        target: "backend"
+        method: "action_running"
+        asserts:
+          state:
+            type: "value"
+            expected: "running"
+
+  - name: "Fingerspot Backend - Switch between running backends"
+    steps:
+      - step: "Create first backend"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend1"
+        values:
+          name: "Test Backend Switch 1"
+          code: "FBS01"
+          base_url: "http://test1.fingerspot.local"
+          api_token: "token_switch_1"
+          api_attlog: "/api/attlog"
+
+      - step: "Set first backend as running"
+        action: "call"
+        target: "backend1"
+        method: "action_running"
+        asserts:
+          state:
+            type: "value"
+            expected: "running"
+
+      - step: "Create second backend"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend2"
+        values:
+          name: "Test Backend Switch 2"
+          code: "FBS02"
+          base_url: "http://test2.fingerspot.local"
+          api_token: "token_switch_2"
+          api_attlog: "/api/attlog"
+
+      - step: "Set second backend as running - first should become draft"
+        action: "call"
+        target: "backend2"
+        method: "action_running"
+        asserts:
+          state:
+            type: "value"
+            expected: "running"
+
+      - step: "Assert first backend is now draft"
+        action: "assert"
+        target: "backend1"
+        asserts:
+          state:
+            type: "value"
+            expected: "draft"
+
+      - step: "Restart second backend"
+        action: "call"
+        target: "backend2"
+        method: "action_restart"
+        asserts:
+          state:
+            type: "value"
+            expected: "draft"
+
+  - name: "Fingerspot Data Machine and Machine User"
+    steps:
+      - step: "Create fingerspot backend for machine test"
+        action: "create"
+        model: "fingerspot_backend"
+        save_as: "backend"
+        values:
+          name: "Test Backend for Machine"
+          code: "FBMACH"
+          base_url: "http://machine.fingerspot.local"
+          api_token: "token_machine"
+          api_attlog: "/api/attlog"
+
+      - step: "Create fingerspot data machine"
+        action: "create"
+        model: "fingerspot.data.machine"
+        save_as: "machine"
+        values:
+          name: "Test Machine 01"
+          code: "MACH01"
+          device_id: "DEVICE-001"
+
+      - step: "Assert machine was created"
+        action: "assert"
+        target: "machine"
+        asserts:
+          device_id:
+            type: "value"
+            expected: "DEVICE-001"
+
+      - step: "Test machine connection (no-op)"
+        action: "call"
+        target: "machine"
+        method: "action_test_connection"
+
+      - step: "Create machine user with PIN"
+        action: "create"
+        model: "fingerspot.machine.user"
+        save_as: "machine_user"
+        values:
+          machine_id: "EVAL: registry['machine'].id"
+          pin: "12345"
+
+      - step: "Assert machine user was created"
+        action: "assert"
+        target: "machine_user"
+        asserts:
+          pin:
+            type: "value"
+            expected: "12345"
+          device_id:
+            type: "value"
+            expected: "DEVICE-001"
