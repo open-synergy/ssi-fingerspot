@@ -18,7 +18,7 @@ Available addons
 ----------------
 addon | version | maintainers | summary
 --- | --- | --- | ---
-[ssi_fingerspot](ssi_fingerspot/) | 14.0.3.1.0 |  | Fingerspot Attendance Machine Integration with Odoo
+[ssi_fingerspot](ssi_fingerspot/) | 14.0.3.2.0 |  | Fingerspot Attendance Machine Integration with Odoo
 
 [//]: # (end addons)
 
