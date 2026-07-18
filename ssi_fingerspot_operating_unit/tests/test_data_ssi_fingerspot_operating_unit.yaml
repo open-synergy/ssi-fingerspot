@@ -1,0 +1,98 @@
+setup:
+  steps:
+    - step: "Create fingerspot backend"
+      action: "create"
+      model: "fingerspot_backend"
+      save_as: "backend"
+      values:
+        name: "Fingerspot OU Test Backend"
+        code: "EVAL: 'FSOUB' + datetime.now().strftime('%H%M%S%f')"
+        base_url: "http://ou.fingerspot.local"
+        api_token: "token_ou"
+        api_attlog: "/api/attlog"
+
+    - step: "Set backend as running"
+      action: "call"
+      target: "backend"
+      method: "action_running"
+      asserts:
+        state:
+          type: "value"
+          expected: "running"
+
+    - step: "Create fingerspot data machine"
+      action: "create"
+      model: "fingerspot.data.machine"
+      save_as: "machine"
+      values:
+        name: "Fingerspot OU Test Machine"
+        code: "EVAL: 'FSOUM' + datetime.now().strftime('%H%M%S%f')"
+        device_id: "EVAL: 'DEVICE-OU-' + datetime.now().strftime('%H%M%S%f')"
+
+    - step: "Create attendance machine batch with operating_unit_id"
+      action: "create"
+      model: "fingerspot.attendance.machine.batch"
+      save_as: "batch"
+      as_user: "base.user_admin"
+      values:
+        fingerspot_backend_id: "REC: backend.id"
+        machine_id: "REC: machine.id"
+        date_start: "2024-01-15"
+        date_end: "2024-01-17"
+        operating_unit_id: "REF: operating_unit.main_operating_unit"
+
+scenarios:
+  - name: "Fingerspot Attendance Machine Batch - Operating Unit is set"
+    steps:
+      - step: "Assert batch operating_unit_id is set"
+        action: "assert"
+        target: "batch"
+        asserts:
+          operating_unit_id:
+            type: "value"
+            operator: "is_truthy"
+
+  - name:
+      "Fingerspot Attendance Machine Batch - ir.rule denies access outside assigned
+      operating unit"
+    steps:
+      - step: "Create user restricted to a different operating unit"
+        action: "create"
+        model: "res.users"
+        save_as: "restricted_user"
+        values:
+          name: "Fingerspot Batch OU Restricted User"
+          login: "ou_restricted_fingerspot_batch@example.com"
+          groups_id:
+            [
+              [
+                6,
+                0,
+                [
+                  "REF: base.group_user",
+                  "REF: ssi_fingerspot.fingerspot_attendance_machine_batch_user_group",
+                  "REF:
+                  ssi_fingerspot_operating_unit.fingerspot_attendance_machine_batch_ou_group",
+                ],
+              ],
+            ]
+          assigned_operating_unit_ids: [[6, 0, []]]
+
+      - step: "Restricted user cannot read the record outside their operating unit"
+        action: "call"
+        target: "batch"
+        method: "read"
+        as_user: "restricted_user"
+        args:
+          - ["operating_unit_id"]
+        expect_error:
+          type: "AccessError"
+
+      - step: "Restricted user cannot write the record outside their operating unit"
+        action: "write"
+        target: "batch"
+        as_user: "restricted_user"
+        expect_error:
+          type: "AccessError"
+        values:
+          date_end: "2024-01-20"
