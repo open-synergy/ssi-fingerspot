@@ -6,7 +6,7 @@ setup:
       save_as: "backend"
       values:
         name: "Fingerspot OU Test Backend"
-        code: "FSOUB"
+        code: "EVAL: 'FSOUB' + datetime.now().strftime('%H%M%S%f')"
         base_url: "http://ou.fingerspot.local"
         api_token: "token_ou"
         api_attlog: "/api/attlog"
@@ -26,8 +26,8 @@ setup:
       save_as: "machine"
       values:
         name: "Fingerspot OU Test Machine"
-        code: "FSOUM"
-        device_id: "DEVICE-OU-001"
+        code: "EVAL: 'FSOUM' + datetime.now().strftime('%H%M%S%f')"
+        device_id: "EVAL: 'DEVICE-OU-' + datetime.now().strftime('%H%M%S%f')"
 
     - step: "Create attendance machine batch with operating_unit_id"
       action: "create"
